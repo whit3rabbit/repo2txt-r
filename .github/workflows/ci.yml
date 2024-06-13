@@ -53,7 +53,7 @@ jobs:
           command: "build"
           target: ${{ matrix.target }}
           toolchain: ${{ matrix.toolchain }}
-          args: "--release"
+          args: "--locked --release"
           strip: true
       - name: Run tests
         uses: houseabsolute/actions-rust-cross@v0
@@ -61,7 +61,7 @@ jobs:
           command: "test"
           target: ${{ matrix.target }}
           toolchain: ${{ matrix.toolchain }}
-          args: "--locked --release"
+          args: "--release"
         if: ${{ !matrix.skip_tests }}
       - name: Package as archive
         shell: bash
@@ -94,10 +94,11 @@ jobs:
       - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
-          path: .
+          path: . # Ensure artifacts are downloaded to the current directory
       - name: Move artifacts to root
         run: |
-          find . -type f -name 'repo2txt-r-*' -exec mv {} . \;
+          find . -name '*.zip' -exec mv {} . \;
+          find . -name '*.tar.gz' -exec mv {} . \;
       - name: List artifacts
         run: ls -la
       - name: Create release
