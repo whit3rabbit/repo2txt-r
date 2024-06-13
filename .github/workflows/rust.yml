@@ -99,5 +99,4 @@ jobs:
         with:
           draft: true
           files: "repo2txt-r-${{ matrix.os_name }}.*"
-          body_path: Changes.md
         if: startsWith(github.ref, 'refs/tags/v')
