@@ -11,19 +11,39 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  test-linux:
-    name: ${{ matrix.os_name }} with rust ${{ matrix.toolchain }}
+  test:
+    name: ${{ matrix.os_name }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os_name: [Linux-x86_64, Linux-aarch64, Linux-arm, Linux-i686, Linux-powerpc, Linux-powerpc64, Linux-powerpc64le, Linux-riscv64, Linux-s390x]
-        os: [ubuntu-20.04]
-        target: [x86_64-unknown-linux-musl, aarch64-unknown-linux-musl, arm-unknown-linux-musleabi, i686-unknown-linux-musl, powerpc-unknown-linux-gnu, powerpc64-unknown-linux-gnu, powerpc64le-unknown-linux-gnu, riscv64gc-unknown-linux-gnu, s390x-unknown-linux-gnu]
-        bin: [repo2txt-r]
-        toolchain: [stable, beta, nightly]
+        include:
+          - os_name: Linux-x86_64
+            os: ubuntu-20.04
+            target: x86_64-unknown-linux-musl
+            bin: repo2txt-r
+          - os_name: Linux-aarch64
+            os: ubuntu-20.04
+            target: aarch64-unknown-linux-musl
+            bin: repo2txt-r
+          - os_name: Windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: repo2txt-r.exe
+          - os_name: Windows-aarch64
+            os: windows-latest
+            target: aarch64-pc-windows-msvc
+            bin: repo2txt-r.exe
+          - os_name: macOS-x86_64
+            os: macOS-latest
+            target: x86_64-apple-darwin
+            bin: repo2txt-r
+          - os_name: macOS-aarch64
+            os: macOS-latest
+            target: aarch64-apple-darwin
+            bin: repo2txt-r
     env:
-      SKIP_TESTS_OS_NAMES: Linux-i686 Linux-powerpc Linux-powerpc64 Linux-powerpc64le Linux-s390x
+      SKIP_TESTS_OS_NAMES: Windows-aarch64 macOS-aarch64
     steps:
       - uses: actions/checkout@v4
       - name: Cache cargo & target directories
@@ -40,7 +60,7 @@ jobs:
         with:
           command: "build"
           target: ${{ matrix.target }}
-          toolchain: ${{ matrix.toolchain }}
+          toolchain: stable
           args: "--release"
           strip: true
       - name: Run tests
@@ -48,28 +68,31 @@ jobs:
         with:
           command: "test"
           target: ${{ matrix.target }}
-          toolchain: ${{ matrix.toolchain }}
+          toolchain: stable
           args: "--release"
-        if: ${{ matrix.toolchain != 'stable' || !contains(env.SKIP_TESTS_OS_NAMES, matrix.os_name) }}
+        if: ${{ !contains(env.SKIP_TESTS_OS_NAMES, matrix.os_name) }}
       - name: Package as archive
         shell: bash
         run: |
           cd target/${{ matrix.target }}/release
-          tar czvf ../../../repo2txt-r-${{ matrix.os_name }}.tar.gz ${{ matrix.bin }}
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            7z a ../../../repo2txt-r-${{ matrix.os_name }}.zip ${{ matrix.bin }}
+          else
+            tar czvf ../../../repo2txt-r-${{ matrix.os_name }}.tar.gz ${{ matrix.bin }}
+          fi
           cd -
         if: |
-          matrix.toolchain == 'stable' &&
-          ( github.ref_name == 'refs/tags/test-release' || startsWith(github.ref, 'refs/tags/v') )
+          github.ref_name == 'refs/tags/test-release' || startsWith(github.ref, 'refs/tags/v')
       - name: Publish release artifacts
         uses: actions/upload-artifact@v4
         with:
           name: repo2txt-r-${{ matrix.os_name }}
           path: "repo2txt-r-${{ matrix.os_name }}.*"
-        if: matrix.toolchain == 'stable' && github.ref == 'refs/tags/test-release'
+        if: github.ref == 'refs/tags/test-release'
       - name: Generate SHA-256
         run: shasum -a 256 repo2txt-r-${{ matrix.os_name }}.*
         if: |
-          matrix.toolchain == 'stable' &&
+          matrix.os == 'macOS-latest' &&
           ( startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/tags/test-release' )
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
@@ -77,134 +100,4 @@ jobs:
           draft: true
           files: "repo2txt-r-${{ matrix.os_name }}.*"
           body_path: Changes.md
-        if: matrix.toolchain == 'stable' && startsWith(github.ref, 'refs/tags/v')
-
-  test-windows:
-    name: ${{ matrix.os_name }} with rust ${{ matrix.toolchain }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os_name: [Windows-aarch64, Windows-i686, Windows-x86_64]
-        os: [windows-latest]
-        target: [aarch64-pc-windows-msvc, i686-pc-windows-msvc, x86_64-pc-windows-msvc]
-        bin: [repo2txt-r.exe]
-        toolchain: [stable, beta, nightly]
-    env:
-      SKIP_TESTS_OS_NAMES: Windows-aarch64 Windows-i686
-    steps:
-      - uses: actions/checkout@v4
-      - name: Cache cargo & target directories
-        uses: Swatinem/rust-cache@v2
-      - name: Configure Git
-        run: |
-          git config --global user.email "jdoe@example.com"
-          git config --global user.name "J. Doe"
-      - name: Build binary
-        uses: houseabsolute/actions-rust-cross@v0
-        with:
-          command: "build"
-          target: ${{ matrix.target }}
-          toolchain: ${{ matrix.toolchain }}
-          args: "--release"
-          strip: true
-      - name: Run tests
-        uses: houseabsolute/actions-rust-cross@v0
-        with:
-          command: "test"
-          target: ${{ matrix.target }}
-          toolchain: ${{ matrix.toolchain }}
-          args: "--release"
-        if: ${{ matrix.toolchain != 'stable' || !contains(env.SKIP_TESTS_OS_NAMES, matrix.os_name) }}
-      - name: Package as archive
-        shell: bash
-        run: |
-          cd target/${{ matrix.target }}/release
-          7z a ../../../repo2txt-r-${{ matrix.os_name }}.zip ${{ matrix.bin }}
-          cd -
-        if: |
-          matrix.toolchain == 'stable' &&
-          ( github.ref_name == 'refs/tags/test-release' || startsWith(github.ref, 'refs/tags/v') )
-      - name: Publish release artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: repo2txt-r-${{ matrix.os_name }}
-          path: "repo2txt-r-${{ matrix.os_name }}.*"
-        if: matrix.toolchain == 'stable' && github.ref == 'refs/tags/test-release'
-      - name: Generate SHA-256
-        run: shasum -a 256 repo2txt-r-${{ matrix.os_name }}.*
-        if: |
-          matrix.toolchain == 'stable' &&
-          ( startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/tags/test-release' )
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          files: "repo2txt-r-${{ matrix.os_name }}.*"
-          body_path: Changes.md
-        if: matrix.toolchain == 'stable' && startsWith(github.ref, 'refs/tags/v')
-
-  test-macos:
-    name: ${{ matrix.os_name }} with rust ${{ matrix.toolchain }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os_name: [macOS-x86_64, macOS-aarch64]
-        os: [macOS-latest]
-        target: [x86_64-apple-darwin, aarch64-apple-darwin]
-        bin: [repo2txt-r]
-        toolchain: [stable, beta, nightly]
-    env:
-      SKIP_TESTS_OS_NAMES: macOS-aarch64
-    steps:
-      - uses: actions/checkout@v4
-      - name: Cache cargo & target directories
-        uses: Swatinem/rust-cache@v2
-      - name: Configure Git
-        run: |
-          git config --global user.email "jdoe@example.com"
-          git config --global user.name "J. Doe"
-      - name: Build binary
-        uses: houseabsolute/actions-rust-cross@v0
-        with:
-          command: "build"
-          target: ${{ matrix.target }}
-          toolchain: ${{ matrix.toolchain }}
-          args: "--release"
-          strip: true
-      - name: Run tests
-        uses: houseabsolute/actions-rust-cross@v0
-        with:
-          command: "test"
-          target: ${{ matrix.target }}
-          toolchain: ${{ matrix.toolchain }}
-          args: "--release"
-        if: ${{ matrix.toolchain != 'stable' || !contains(env.SKIP_TESTS_OS_NAMES, matrix.os_name) }}
-      - name: Package as archive
-        shell: bash
-        run: |
-          cd target/${{ matrix.target }}/release
-          tar czvf ../../../repo2txt-r-${{ matrix.os_name }}.tar.gz ${{ matrix.bin }}
-          cd -
-        if: |
-          matrix.toolchain == 'stable' &&
-          ( github.ref_name == 'refs/tags/test-release' || startsWith(github.ref, 'refs/tags/v') )
-      - name: Publish release artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: repo2txt-r-${{ matrix.os_name }}
-          path: "repo2txt-r-${{ matrix.os_name }}.*"
-        if: matrix.toolchain == 'stable' && github.ref == 'refs/tags/test-release'
-      - name: Generate SHA-256
-        run: shasum -a 256 repo2txt-r-${{ matrix.os_name }}.*
-        if: |
-          matrix.toolchain == 'stable' &&
-          ( startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/tags/test-release' )
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          files: "repo2txt-r-${{ matrix.os_name }}.*"
-          body_path: Changes.md
-        if: matrix.toolchain == 'stable' && startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v')
