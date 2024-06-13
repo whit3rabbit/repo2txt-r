@@ -1,0 +1,85 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build:
+    name: Build - ${{ matrix.os_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os_name: FreeBSD-x86_64
+            os: ubuntu-20.04
+            target: x86_64-unknown-freebsd
+            bin: repo2txt-r
+            name: repo2txt-r-FreeBSD-x86_64.tar.gz
+
+          - os_name: Linux-x86_64
+            os: ubuntu-20.04
+            target: x86_64-unknown-linux-musl
+            bin: repo2txt-r
+            name: repo2txt-r-Linux-x86_64-musl.tar.gz
+
+          - os_name: Windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: repo2txt-r.exe
+            name: repo2txt-r-Windows-x86_64.zip
+
+          - os_name: macOS-x86_64
+            os: macOS-latest
+            target: x86_64-apple-darwin
+            bin: repo2txt-r
+            name: repo2txt-r-Darwin-x86_64.tar.gz
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache cargo & target directories
+        uses: Swatinem/rust-cache@v2
+      - name: Build binary
+        uses: houseabsolute/actions-rust-cross@v0
+        with:
+          command: "build"
+          target: ${{ matrix.target }}
+          args: "--locked --release"
+          strip: true
+      - name: Package as archive
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            7z a ../../../${{ matrix.name }} ${{ matrix.bin }}
+          else
+            tar czvf ../../../${{ matrix.name }} ${{ matrix.bin }}
+          fi
+          cd -
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.name }}
+        if: startsWith(github.ref, 'refs/tags/v')
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: "repo2txt-r-*"
+          draft: true
