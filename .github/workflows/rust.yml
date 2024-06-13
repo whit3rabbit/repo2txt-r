@@ -39,6 +39,8 @@ jobs:
             os: macOS-latest
             target: x86_64-apple-darwin
             bin: repo2txt-r
+    env:
+      SKIP_TESTS_OS_NAMES: FreeBSD-x86_64 Linux-i686 Linux-powerpc Linux-powerpc64 Linux-powerpc64le Linux-s390x NetBSD-x86_64 Windows-aarch64 Windows-i686 macOS-aarch64
     steps:
       - uses: actions/checkout@v4
       - name: Cache cargo & target directories
@@ -65,7 +67,7 @@ jobs:
           target: ${{ matrix.target }}
           toolchain: ${{ matrix.toolchain }}
           args: "--release"
-        if: ${{ matrix.toolchain != 'stable' || !contains(['FreeBSD-x86_64', 'Linux-i686', 'Linux-powerpc', 'Linux-powerpc64', 'Linux-powerpc64le', 'Linux-s390x', 'NetBSD-x86_64', 'Windows-aarch64', 'Windows-i686', 'macOS-aarch64'], matrix.os) }}
+        if: ${{ matrix.toolchain != 'stable' || !contains(env.SKIP_TESTS_OS_NAMES, matrix.os_name) }}
       - name: Package as archive
         shell: bash
         run: |
