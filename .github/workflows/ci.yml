@@ -94,17 +94,17 @@ jobs:
       - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
-          path: . # Ensure artifacts are downloaded to the current directory
+          path: ./artifacts
+      - name: List all files before moving
+        run: find ./artifacts -type f
       - name: Move artifacts to root
         run: |
-          find . -name '*.zip' -exec mv {} . \;
-          find . -name '*.tar.gz' -exec mv {} . \;
+          find ./artifacts -name '*.zip' -exec mv {} . \;
+          find ./artifacts -name '*.tar.gz' -exec mv {} . \;
       - name: List artifacts
         run: ls -la
       - name: Create release
         uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: repo2txt-r-*
           draft: true
