@@ -83,9 +83,13 @@ jobs:
       - name: List artifacts
         run: ls -la
       - name: Create release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: "*"
+          files: |
+            repo2txt-r-Windows-x86_64.zip/repo2txt-r-Windows-x86_64.zip
+            repo2txt-r-FreeBSD-x86_64.tar.gz/repo2txt-r-FreeBSD-x86_64.tar.gz
+            repo2txt-r-Linux-x86_64-musl.tar.gz/repo2txt-r-Linux-x86_64-musl.tar.gz
+            repo2txt-r-Darwin-x86_64.tar.gz/repo2txt-r-Darwin-x86_64.tar.gz
           draft: true
