@@ -12,6 +12,7 @@ pub struct Args {
     pub include_dir: Option<PathBuf>,
     pub ignore_settings: bool,
     pub use_gitignore: bool,
+    pub file_path: Option<PathBuf>,
 }
 
 pub fn parse_args(default_output_file: &str) -> Args {
@@ -75,6 +76,14 @@ pub fn parse_args(default_output_file: &str) -> Args {
                 .help("Flag to ignore .gitignore file.")
                 .action(ArgAction::SetFalse)
         )
+        .arg(
+            Arg::new("file_path")
+                .short('f')
+                .long("file")
+                .value_name("FILE_PATH")
+                .help("Path to the file to process.")
+                .action(ArgAction::Set)
+        )
         .get_matches();
 
     let repo_path = matches.get_one::<String>("repo_path").unwrap_or(&String::from(".")).into();
@@ -85,6 +94,7 @@ pub fn parse_args(default_output_file: &str) -> Args {
     let include_dir = matches.get_one::<String>("include_dir").map(PathBuf::from);
     let ignore_settings = matches.get_flag("ignore_settings");
     let use_gitignore = !matches.get_flag("use_gitignore");
+    let file_path = matches.get_one::<String>("file_path").map(PathBuf::from);
 
     Args {
         repo_path,
@@ -95,5 +105,6 @@ pub fn parse_args(default_output_file: &str) -> Args {
         include_dir,
         ignore_settings,
         use_gitignore,
+        file_path,
     }
 }
