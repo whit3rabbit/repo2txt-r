@@ -2,6 +2,10 @@
 
 `repo2txt-r` is a Rust-based command-line tool that generates a comprehensive documentation file for a given repository. This documentation includes a hierarchical tree view of directories and files, along with the content of each file.
 
+## Download and run
+
+Check the release tab to download the binary and run.
+
 ## Features
 
 - Generates a directory and file tree in a readable format.
