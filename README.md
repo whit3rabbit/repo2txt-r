@@ -1,55 +1,94 @@
-# repo2txt-r
+# repo2txt
 
-`repo2txt-r` is a Rust-based command-line tool that generates a comprehensive documentation file for a given repository. This documentation includes a hierarchical tree view of directories and files, along with the content of each file.
-
-## Download and run
-
-Check the release tab to download the binary and run.
+`repo2txt` is a command-line tool that documents the structure of a GitHub repository. It generates a text file containing a directory/file tree and the contents of each file in the repository.
 
 ## Features
 
-- Generates a directory and file tree in a readable format.
-- Includes the content of each file in the documentation.
-- Allows customization to ignore specific file types or directories.
-- Honors `.gitignore` files for excluding paths.
+- Generates a text file documenting the repository structure and file contents
+- Supports customizable ignore lists for file names, extensions, and directories
+- Allows specifying a specific directory to include
+- Supports ignoring common settings files
+- Can use the repository's `.gitignore` file to exclude files and directories
+- Provides an option to document a single file instead of the entire repository
 
-## Configuration
+## Installation
 
-The tool uses a `config.json` file for configuration, which includes the following settings:
+### Using Pre-built Binaries
 
-```json
-{
-  "image_extensions": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".tiff", ".webp"],
-  "video_extensions": [".mp4", ".avi", ".mov", ".wmv", ".flv", ".mkv", ".webm"],
-  "audio_extensions": [".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a"],
-  "document_extensions": [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"],
-  "executable_extensions": [".exe", ".dll", ".so", ".class", ".jar", ".pyc"],
-  "settings_extensions": [".json", ".yaml", ".yml", ".xml"],
-  "additional_ignore_types": [".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".bin", ".dat", ".db", ".log"]
-}
-```
+1. Visit the [releases page](https://github.com/your-username/repo2txt/releases) of this repository.
+2. Download the appropriate binary for your operating system.
+3. Extract the downloaded archive.
+4. Move the `repo2txt` binary to a directory in your system's PATH.
+
+### Building from Source
+
+1. Ensure you have Rust installed on your system. If not, follow the [official installation guide](https://www.rust-lang.org/tools/install).
+2. Clone this repository:
+   ```
+   git clone https://github.com/your-username/repo2txt.git
+   ```
+3. Navigate to the repository directory:
+   ```
+   cd repo2txt
+   ```
+4. Build the project:
+   ```
+   cargo build --release
+   ```
+5. The compiled binary will be located at `target/release/repo2txt`. You can move it to a directory in your system's PATH for easier access.
 
 ## Usage
 
-Run the tool with the following command:
+```
+USAGE:
+    repo2txt [OPTIONS]
 
-```sh
-cargo run --release -- <repo-path> <output-file> [options]
-Options:
-
---exclude-dir <dir>: Exclude a specific directory.
---ignore-files <file>: Ignore specific files.
---ignore-types <ext>: Ignore specific file types.
---use-gitignore: Honor .gitignore files.
+OPTIONS:
+    -r, --repo_path <REPO_PATH>          Path to the directory to process (i.e., cloned repo). If no path is specified, defaults to the current directory.
+    -o, --output_file <OUTPUT_FILE>      Name for the output text file. Defaults to "output.txt".
+        --ignore-files <IGNORE_FILES>    List of file names to ignore. Omit this argument to ignore no file names.
+        --ignore-types <IGNORE_TYPES>    List of file extensions to ignore. Defaults to list in config.json. Omit this argument to ignore no types.
+        --exclude-dir <EXCLUDE_DIR>      List of directory names to exclude or "none" for no directories.
+        --ignore-settings                Flag to ignore common settings files.
+        --include-dir <INCLUDE_DIR>      Specific directory to include. Only contents of this directory will be documented.
+        --no-gitignore                   Flag to ignore .gitignore file.
+    -f, --file <FILE_PATH>               Path to the file to process.
+    -h, --help                           Print help information
+    -V, --version                        Print version information
 ```
 
-Example
-To generate documentation for a repository located at ./my-repo and save the output to output.txt, run:
+## Examples
 
-```sh
-cargo run --release -- ./my-repo output.txt --use-gitignore
-```
+- Document the structure of a repository:
+  ```
+  repo2txt -r /path/to/repo
+  ```
+
+- Document a specific directory within a repository:
+  ```
+  repo2txt -r /path/to/repo --include-dir /path/to/specific/directory
+  ```
+
+- Document a single file:
+  ```
+  repo2txt -f /path/to/file
+  ```
+
+## Configuration
+
+The `config.json` file allows you to customize the behavior of `repo2txt`. You can modify the following settings:
+
+- `image_extensions`: List of image file extensions to ignore.
+- `video_extensions`: List of video file extensions to ignore.
+- `audio_extensions`: List of audio file extensions to ignore.
+- `document_extensions`: List of document file extensions to ignore.
+- `executable_extensions`: List of executable file extensions to ignore.
+- `settings_extensions`: List of settings file extensions to ignore when using the `--ignore-settings` flag.
+- `additional_ignore_types`: Additional file extensions to ignore.
+- `default_output_file`: Default name for the output text file.
+
+This config is built into the binary at build time so it won't do any good to alter it afterwards.
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the [MIT License](LICENSE).
