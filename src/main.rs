@@ -100,13 +100,23 @@ fn main() -> io::Result<()> {
     let args = args::parse_args(&config.default_output_file);
     let max_depth = 100;
 
-    let mut output_file = File::create(&args.output_file)?;
+    let mut output_file = File::create(&args.output_file)
+        .map_err(|e| {
+            eprintln!("Error: Unable to create output file: {}\nError: {}", args.output_file, e);
+            e
+        })?;
 
     writeln!(output_file, "Repository Documentation")?;
     writeln!(output_file, "This document provides an overview of the repository's structure and contents.")?;
     writeln!(output_file, "The 'Directory/File Tree' section displays the repository's hierarchy.")?;
     writeln!(output_file, "The 'File Content' section details the contents of each file.")?;
     writeln!(output_file, "File contents are marked with '[File Begins]' and '[File Ends]' tags.\n")?;
+
+    let repo_path = if args.repo_path.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        &args.repo_path
+    };
 
     if let Some(file_path) = &args.file_path {
         // If a file path is provided, process the single file
@@ -118,19 +128,19 @@ fn main() -> io::Result<()> {
         process_single_file(file_path, &mut output_file)?;
     } else {
         // If no file path is provided, process the directory
-        if !args.repo_path.is_dir() {
-            eprintln!("Error: The specified directory does not exist, path is wrong or is not a directory: {}", args.repo_path.display());
+        if !repo_path.is_dir() {
+            eprintln!("Error: The specified directory does not exist, path is wrong or is not a directory: {}", repo_path.display());
             return Ok(());
         }
 
         writeln!(output_file, "Directory/File Tree Begins -->\n")?;
-        let walker = walk_repo(&args.repo_path, &args)?;
+        let walker = walk_repo(repo_path, &args)?;
         let mut seen = std::collections::HashSet::new();
         write::write_tree(walker, &mut output_file, &args, &config, "", true, max_depth, 0, &mut seen)?;
         writeln!(output_file, "\n<-- Directory/File Tree Ends")?;
 
         writeln!(output_file, "\nFile Content Begins -->\n")?;
-        let walker = walk_repo(&args.repo_path, &args)?;
+        let walker = walk_repo(repo_path, &args)?;
         write::write_file_contents_in_order(walker, &mut output_file, &args, &config, &mut seen)?;
         writeln!(output_file, "\n<-- File Content Ends\n")?;
     }
