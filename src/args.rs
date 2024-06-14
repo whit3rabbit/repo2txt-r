@@ -13,6 +13,7 @@ pub struct Args {
     pub ignore_settings: bool,
     pub use_gitignore: bool,
     pub file_path: Option<PathBuf>,
+    pub config_path: Option<PathBuf>,
 }
 
 pub fn parse_args(default_output_file: &str) -> Args {
@@ -84,6 +85,13 @@ pub fn parse_args(default_output_file: &str) -> Args {
                 .help("Path to the file to process.")
                 .action(ArgAction::Set)
         )
+        .arg(
+            Arg::new("config_path")
+                .long("config")
+                .value_name("CONFIG_PATH")
+                .help("Path to a custom configuration file. If not specified, the default configuration is used.")
+                .action(ArgAction::Set)
+        )
         .get_matches();
 
     let repo_path = matches.get_one::<String>("repo_path").unwrap_or(&String::from(".")).into();
@@ -95,6 +103,7 @@ pub fn parse_args(default_output_file: &str) -> Args {
     let ignore_settings = matches.get_flag("ignore_settings");
     let use_gitignore = !matches.get_flag("use_gitignore");
     let file_path = matches.get_one::<String>("file_path").map(PathBuf::from);
+    let config_path = matches.get_one::<String>("config_path").map(PathBuf::from);
 
     Args {
         repo_path,
@@ -106,5 +115,6 @@ pub fn parse_args(default_output_file: &str) -> Args {
         ignore_settings,
         use_gitignore,
         file_path,
+        config_path,
     }
 }

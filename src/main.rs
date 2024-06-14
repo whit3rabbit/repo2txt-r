@@ -20,9 +20,15 @@ struct Config {
     default_output_file: String,
 }
 
-fn load_config() -> Config {
+fn load_default_config() -> Config {
     let json_str = include_str!("config.json");
-    serde_json::from_str(json_str).expect("Failed to parse config.json")
+    serde_json::from_str(json_str).expect("Failed to parse default config.json")
+}
+
+fn load_config_from_file(file_path: &Path) -> io::Result<Config> {
+    let file_content = std::fs::read_to_string(file_path)?;
+    let config: Config = serde_json::from_str(&file_content)?;
+    Ok(config)
 }
 
 fn should_ignore(item: &Path, args: &Args, config: &Config, output_file: &str) -> bool {
@@ -33,24 +39,29 @@ fn should_ignore(item: &Path, args: &Args, config: &Config, output_file: &str) -
 
     let file_ext = item.extension().unwrap_or_default().to_string_lossy().to_lowercase();
     
+    // Ignore the output file itself
     if item.canonicalize().map_or(false, |p| p == Path::new(output_file).canonicalize().unwrap()) {
         return true;
     }
 
+    // Ignore hidden files and directories (starting with '.')
     if item_name.starts_with('.') {
         return true;
     }
 
+    // Ignore directories listed in exclude_dir
     if item.is_dir() && args.exclude_dir.contains(&item_name.to_string()) {
         return true;
     }
 
+    // Only include files in include_dir if specified
     if let Some(include_dir) = &args.include_dir {
         if !item.canonicalize().map_or(false, |p| p.starts_with(include_dir)) {
             return true;
         }
     }
 
+    // Collect all file extensions to be ignored
     let ignore_file_types: Vec<String> = [
         &config.image_extensions,
         &config.video_extensions,
@@ -63,11 +74,13 @@ fn should_ignore(item: &Path, args: &Args, config: &Config, output_file: &str) -
     .flat_map(|v| v.iter().cloned())
     .collect();
 
-    if item.is_file() && (args.ignore_files.contains(&item_name.to_string()) || ignore_file_types.contains(&file_ext.to_string())) {
+    // Ignore files with extensions specified in the configuration
+    if item.is_file() && (args.ignore_files.contains(&item_name.to_string()) || ignore_file_types.contains(&file_ext)) {
         return true;
     }
 
-    if args.ignore_settings && config.settings_extensions.contains(&file_ext.to_string()) {
+    // Ignore common settings files if the flag is set
+    if args.ignore_settings && config.settings_extensions.contains(&file_ext) {
         return true;
     }
 
@@ -96,9 +109,21 @@ fn process_single_file(file_path: &Path, output_file: &mut File) -> io::Result<(
 }
 
 fn main() -> io::Result<()> {
-    let config = load_config();
-    let args = args::parse_args(&config.default_output_file);
+    let default_config = load_default_config();
+    let args = args::parse_args(&default_config.default_output_file);
     let max_depth = 100;
+
+    let config = if let Some(config_path) = &args.config_path {
+        match load_config_from_file(config_path) {
+            Ok(config) => config,
+            Err(e) => {
+                eprintln!("Warning: Failed to load config from file: {}. Using default config.\nError: {}", config_path.display(), e);
+                default_config
+            }
+        }
+    } else {
+        default_config
+    };
 
     let mut output_file = File::create(&args.output_file)
         .map_err(|e| {

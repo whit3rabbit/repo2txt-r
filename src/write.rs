@@ -25,60 +25,50 @@ pub fn write_tree(
     let mut entries: Vec<DirEntry> = walker.filter_map(Result::ok).collect();
     entries.sort_by_key(|e| e.path().to_path_buf());
 
-    if let Some(root_entry) = entries.get(0) {
-        let dir_path = root_entry.path();
-        if is_root {
-            if dir_path == Path::new(".") {
-                writeln!(output_file, "./")?;
-            } else if let Some(file_name) = dir_path.file_name() {
-                writeln!(output_file, "{}/", file_name.to_string_lossy())?;
-            } else {
-                eprintln!("Warning: Unable to get file name for root directory: {:?}", dir_path);
-            }
+    for (index, entry) in entries.iter().enumerate() {
+        let item = entry.path();
+
+        if should_ignore(item, args, config, &args.output_file) {
+            continue;
         }
 
-        for (index, entry) in entries.iter().enumerate() {
-            let item = entry.path();
-            if should_ignore(item, args, config, &args.output_file) {
+        // Skip if already seen
+        let canonicalized_item = match item.canonicalize() {
+            Ok(path) => path,
+            Err(e) => {
+                eprintln!("Warning: Unable to canonicalize directory: {:?}\nError: {}", item, e);
                 continue;
             }
+        };
+        if seen.contains(&canonicalized_item) {
+            continue;
+        }
+        seen.insert(canonicalized_item.clone());
 
-            let is_last_item = index == entries.len() - 1;
-            let new_prefix = if is_last_item { "└── " } else { "├── " };
-            let child_prefix = if is_last_item { "    " } else { "│   " };
+        let is_last_item = index == entries.len() - 1;
+        let new_prefix = if is_last_item { "└── " } else { "├── " };
+        let child_prefix = if is_last_item { "    " } else { "│   " };
 
-            if let Some(file_name) = item.file_name() {
-                writeln!(output_file, "{}{}{}", prefix, new_prefix, file_name.to_string_lossy())?;
-            } else {
-                eprintln!("Warning: Unable to get file name for item: {:?}", item);
-                continue;
-            }
+        if let Some(file_name) = item.file_name() {
+            writeln!(output_file, "{}{}{}", prefix, new_prefix, file_name.to_string_lossy())?;
+        } else {
+            eprintln!("Warning: Unable to get file name for item: {:?}", item);
+            continue;
+        }
 
-            if item.is_dir() {
-                let canonicalized_item = match item.canonicalize() {
-                    Ok(path) => path,
-                    Err(e) => {
-                        eprintln!("Warning: Unable to canonicalize directory: {:?}\nError: {}", item, e);
-                        continue;
-                    }
-                };
-                if seen.contains(&canonicalized_item) {
-                    continue; // Prevent infinite recursion
-                }
-                seen.insert(canonicalized_item);
-                let sub_walker = WalkBuilder::new(item).build();
-                write_tree(
-                    sub_walker,
-                    output_file,
-                    args,
-                    config,
-                    &format!("{}{}", prefix, child_prefix),
-                    false,
-                    max_depth,
-                    current_depth + 1,
-                    seen,
-                )?;
-            }
+        if item.is_dir() {
+            let sub_walker = WalkBuilder::new(item).build();
+            write_tree(
+                sub_walker,
+                output_file,
+                args,
+                config,
+                &format!("{}{}", prefix, child_prefix),
+                false,
+                max_depth,
+                current_depth + 1,
+                seen,
+            )?;
         }
     }
 
