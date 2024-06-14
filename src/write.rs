@@ -28,7 +28,9 @@ pub fn write_tree(
     if let Some(root_entry) = entries.get(0) {
         let dir_path = root_entry.path();
         if is_root {
-            if let Some(file_name) = dir_path.file_name() {
+            if dir_path == Path::new(".") {
+                writeln!(output_file, "./")?;
+            } else if let Some(file_name) = dir_path.file_name() {
                 writeln!(output_file, "{}/", file_name.to_string_lossy())?;
             } else {
                 eprintln!("Warning: Unable to get file name for root directory: {:?}", dir_path);
