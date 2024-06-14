@@ -15,7 +15,7 @@
 
 ### Using Pre-built Binaries
 
-1. Visit the [releases page](https://github.com/your-username/repo2txt/releases) of this repository.
+1. Visit the [releases page](https://github.com/whit3rabbit/repo2txt-r/releases) of this repository.
 2. Download the appropriate binary for your operating system.
 3. Extract the downloaded archive.
 4. Move the `repo2txt` binary to a directory in your system's PATH.
@@ -25,7 +25,7 @@
 1. Ensure you have Rust installed on your system. If not, follow the [official installation guide](https://www.rust-lang.org/tools/install).
 2. Clone this repository:
    ```
-   git clone https://github.com/your-username/repo2txt.git
+   git clone https://github.com/whit3rabbit/repo2txt-r.git
    ```
 3. Navigate to the repository directory:
    ```
@@ -35,13 +35,13 @@
    ```
    cargo build --release
    ```
-5. The compiled binary will be located at `target/release/repo2txt`. You can move it to a directory in your system's PATH for easier access.
+5. The compiled binary will be located at `target/release/repo2txt-r`. You can move it to a directory in your system's PATH for easier access.
 
 ## Usage
 
 ```
 USAGE:
-    repo2txt [OPTIONS]
+    repo2txt-r [OPTIONS]
 
 OPTIONS:
     -r, --repo_path <REPO_PATH>          Path to the directory to process (i.e., cloned repo). If no path is specified, defaults to the current directory.
@@ -61,17 +61,17 @@ OPTIONS:
 
 - Document the structure of a repository:
   ```
-  repo2txt -r /path/to/repo
+  repo2txt-r -r /path/to/repo
   ```
 
 - Document a specific directory within a repository:
   ```
-  repo2txt -r /path/to/repo --include-dir /path/to/specific/directory
+  repo2txt-r -r /path/to/repo --include-dir /path/to/specific/directory
   ```
 
 - Document a single file:
   ```
-  repo2txt -f /path/to/file
+  repo2txt-r -f /path/to/file
   ```
 
 ## Configuration
