@@ -3,6 +3,7 @@ use std::io::{self, Write};
 use std::path::Path;
 use serde::Deserialize;
 use ignore::WalkBuilder;
+use std::collections::HashSet;
 
 mod args;
 mod write;
@@ -18,11 +19,24 @@ struct Config {
     settings_extensions: Vec<String>,
     additional_ignore_types: Vec<String>,
     default_output_file: String,
+    default_ignore_types: HashSet<String>,
 }
 
 fn load_default_config() -> Config {
     let json_str = include_str!("config.json");
-    serde_json::from_str(json_str).expect("Failed to parse default config.json")
+    let mut config: Config = serde_json::from_str(json_str).expect("Failed to parse default config.json");
+    
+    // Combine all default ignore types into a single HashSet
+    config.default_ignore_types = config.image_extensions.iter()
+        .chain(config.video_extensions.iter())
+        .chain(config.audio_extensions.iter())
+        .chain(config.document_extensions.iter())
+        .chain(config.executable_extensions.iter())
+        .chain(config.additional_ignore_types.iter())
+        .cloned()
+        .collect();
+    
+    config
 }
 
 fn load_config_from_file(file_path: &Path) -> io::Result<Config> {
@@ -37,8 +51,20 @@ fn should_ignore(item: &Path, args: &Args, config: &Config, output_file: &str) -
         None => return true,
     };
 
-    let file_ext = item.extension().unwrap_or_default().to_string_lossy().to_lowercase();
-    
+    let file_ext = item.extension()
+        .and_then(|os_str| os_str.to_str())
+        .map(|s| s.to_lowercase())
+        .unwrap_or_default();
+
+    // Check if the file extension is in the ignore list
+    if item.is_file() && (
+        args.ignore_files.contains(&item_name.to_string()) ||
+        args.ignore_types.contains(&file_ext) ||
+        (args.ignore_types.is_empty() && config.default_ignore_types.contains(&format!(".{}", file_ext)))
+    ) {
+        return true;
+    }
+
     // Ignore the output file itself
     if item.canonicalize().map_or(false, |p| p == Path::new(output_file).canonicalize().unwrap()) {
         return true;

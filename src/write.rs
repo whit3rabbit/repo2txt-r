@@ -13,7 +13,7 @@ pub fn write_tree(
     args: &Args,
     config: &Config,
     prefix: &str,
-    is_root: bool,
+    _is_root: bool,
     max_depth: usize,
     current_depth: usize,
     seen: &mut std::collections::HashSet<PathBuf>,
