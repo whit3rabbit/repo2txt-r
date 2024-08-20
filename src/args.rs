@@ -1,120 +1,74 @@
-use clap::{Arg, Command, ArgAction};
-use std::path::PathBuf;
+use clap::{Parser, ValueEnum};
 use std::collections::HashSet;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::hash::Hash;
 
-#[derive(Debug)]
-pub struct Args {
-    pub repo_path: PathBuf,
-    pub output_file: String,
-    pub ignore_files: HashSet<String>,
-    pub ignore_types: HashSet<String>,
-    pub exclude_dir: HashSet<String>,
-    pub include_dir: Option<PathBuf>,
-    pub ignore_settings: bool,
-    pub use_gitignore: bool,
-    pub file_path: Option<PathBuf>,
-    pub config_path: Option<PathBuf>,
+fn parse_set<T: FromStr + Eq + Hash>(s: &str) -> Result<HashSet<T>, String> {
+    s.split(',')
+     .map(str::trim)
+     .map(|item| T::from_str(item).map_err(|_| format!("Failed to parse: {}", item)))
+     .collect()
 }
 
-pub fn parse_args(default_output_file: &str) -> Args {
-    let matches = Command::new("repo2txt")
-        .version("1.0")
-        .author("Your Name <your.email@example.com>")
-        .about("Document the structure of a GitHub repository.")
-        .arg(
-            Arg::new("repo_path")
-                .short('r')
-                .long("repo_path")
-                .value_name("REPO_PATH")
-                .help("Path to the directory to process (i.e., cloned repo). If no path is specified, defaults to the current directory.")
-                .action(ArgAction::Set)
-        )
-        .arg(
-            Arg::new("output_file")
-                .short('o')
-                .long("output_file")
-                .value_name("OUTPUT_FILE")
-                .help(&format!("Name for the output text file. Defaults to \"{}\".", default_output_file))
-                .action(ArgAction::Set)
-        )
-        .arg(
-            Arg::new("ignore_files")
-                .long("ignore-files")
-                .value_name("IGNORE_FILES")
-                .help("List of file names to ignore. Omit this argument to ignore no file names.")
-                .action(ArgAction::Append)
-        )
-        .arg(
-            Arg::new("ignore_types")
-                .long("ignore-types")
-                .value_name("IGNORE_TYPES")
-                .help("List of file extensions to ignore. Defaults to list in config.json. Omit this argument to ignore no types.")
-                .action(ArgAction::Append)
-        )
-        .arg(
-            Arg::new("exclude_dir")
-                .long("exclude-dir")
-                .value_name("EXCLUDE_DIR")
-                .help("List of directory names to exclude or \"none\" for no directories.")
-                .action(ArgAction::Append)
-        )
-        .arg(
-            Arg::new("ignore_settings")
-                .long("ignore-settings")
-                .help("Flag to ignore common settings files.")
-                .action(ArgAction::SetTrue)
-        )
-        .arg(
-            Arg::new("include_dir")
-                .long("include-dir")
-                .value_name("INCLUDE_DIR")
-                .help("Specific directory to include. Only contents of this directory will be documented.")
-                .action(ArgAction::Set)
-        )
-        .arg(
-            Arg::new("use_gitignore")
-                .long("no-gitignore")
-                .help("Flag to ignore .gitignore file.")
-                .action(ArgAction::SetFalse)
-        )
-        .arg(
-            Arg::new("file_path")
-                .short('f')
-                .long("file")
-                .value_name("FILE_PATH")
-                .help("Path to the file to process.")
-                .action(ArgAction::Set)
-        )
-        .arg(
-            Arg::new("config_path")
-                .long("config")
-                .value_name("CONFIG_PATH")
-                .help("Path to a custom configuration file. If not specified, the default configuration is used.")
-                .action(ArgAction::Set)
-        )
-        .get_matches();
+#[derive(Debug, Clone, Parser)]
+#[command(
+    name = "repo2txt",
+    version = "1.2",
+    author = "Your Name <your.email@example.com>",
+    about = "Document the structure of a GitHub repository."
+)]
+pub struct Args {
+    #[arg(short, long, value_name = "REPO_PATH", help = "Path to the directory to process (i.e., cloned repo). If no path is specified, defaults to the current directory.", default_value = ".")]
+    pub repo_path: PathBuf,
 
-    let repo_path = matches.get_one::<String>("repo_path").unwrap_or(&String::from(".")).into();
-    let output_file = matches.get_one::<String>("output_file").unwrap_or(&default_output_file.to_string()).to_string();
-    let ignore_files: HashSet<String> = matches.get_many::<String>("ignore_files").unwrap_or_default().map(|s| s.to_string()).collect();
-    let ignore_types: HashSet<String> = matches.get_many::<String>("ignore_types").unwrap_or_default().map(|s| s.to_string()).collect();
-    let exclude_dir: HashSet<String> = matches.get_many::<String>("exclude_dir").unwrap_or_default().map(|s| s.to_string()).collect();
-    let include_dir = matches.get_one::<String>("include_dir").map(PathBuf::from);
-    let ignore_settings = matches.get_flag("ignore_settings");
-    let use_gitignore = !matches.get_flag("use_gitignore");
-    let file_path = matches.get_one::<String>("file_path").map(PathBuf::from);
-    let config_path = matches.get_one::<String>("config_path").map(PathBuf::from);
+    #[arg(short, long, value_name = "OUTPUT_FILE", help = "Name for the output file. Defaults to \"output.txt\".", default_value = "output.txt")]
+    pub output_file: String,
 
-    Args {
-        repo_path,
-        output_file,
-        ignore_files,
-        ignore_types,
-        exclude_dir,
-        include_dir,
-        ignore_settings,
-        use_gitignore,
-        file_path,
-        config_path,
-    }
+    #[arg(long, value_name = "IGNORE_FILES", help = "List of file names or patterns to ignore. Use glob patterns for wildcards.", default_value = "", value_parser = parse_set::<String>)]
+    pub ignore_files: HashSet<String>,
+
+    #[arg(long, value_name = "IGNORE_TYPES", help = "List of file extensions to ignore.", default_value = "", value_parser = parse_set::<String>)]
+    pub ignore_types: HashSet<String>,
+
+    #[arg(long, value_name = "EXCLUDE_DIR", help = "List of directory names to exclude.", default_value = "node_modules,vendor,dist,build,target", value_parser = parse_set::<String>)]
+    pub exclude_dir: HashSet<String>,
+
+    #[arg(long, value_name = "INCLUDE_DIR", help = "Specific directory to include. Only contents of this directory will be documented.")]
+    pub include_dir: Option<PathBuf>,
+
+    #[arg(long, help = "Flag to ignore common settings files.", default_value_t = true)]
+    pub ignore_settings: bool,
+
+    #[arg(long, help = "Use .gitignore file for ignoring files and directories.", default_value_t = true)]
+    pub use_gitignore: bool,
+
+    #[arg(short, long, value_name = "FILE_PATH", help = "Path to a single file to process.")]
+    pub file_path: Option<PathBuf>,
+
+    #[arg(long, value_name = "CONFIG_PATH", help = "Path to a custom configuration file. If not specified, the default configuration is used.")]
+    pub config_path: Option<PathBuf>,
+
+    #[arg(long, help = "Follow symbolic links when traversing the repository.", default_value_t = false)]
+    pub follow_symlinks: bool,
+
+    #[arg(long, value_name = "MAX_DEPTH", help = "Maximum depth to traverse in the directory tree. Default is 100.", default_value_t = 100)]
+    pub max_depth: usize,
+
+    #[arg(long, value_name = "FORMAT", help = "Output format: text, markdown, or html. Default is text.", value_enum, default_value_t = OutputFormat::Text)]
+    pub output_format: OutputFormat,
+
+    #[arg(long, help = "Include hidden files and directories in the documentation.", default_value_t = false)]
+    pub include_hidden: bool,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum OutputFormat {
+    Text,
+    Markdown,
+    HTML,
+}
+
+pub fn parse_args() -> Args {
+    Args::parse()
 }
