@@ -6,7 +6,7 @@ on:
       - "v*"
 
 env:
-  CRATE_NAME: repo2txt-r
+  CRATE_NAME: repo2txt
   GITHUB_TOKEN: ${{ github.token }}
   RUST_BACKTRACE: 1
 
@@ -21,27 +21,27 @@ jobs:
           - os_name: Linux-x86_64
             os: ubuntu-20.04
             target: x86_64-unknown-linux-musl
-            bin: repo2txt-r
+            bin: repo2txt
           - os_name: Linux-aarch64
             os: ubuntu-20.04
             target: aarch64-unknown-linux-musl
-            bin: repo2txt-r
+            bin: repo2txt
           - os_name: Windows-x86_64
             os: windows-latest
             target: x86_64-pc-windows-msvc
-            bin: repo2txt-r.exe
+            bin: repo2txt.exe
           - os_name: Windows-aarch64
             os: windows-latest
             target: aarch64-pc-windows-msvc
-            bin: repo2txt-r.exe
+            bin: repo2txt.exe
           - os_name: macOS-x86_64
             os: macOS-latest
             target: x86_64-apple-darwin
-            bin: repo2txt-r
+            bin: repo2txt
           - os_name: macOS-aarch64
             os: macOS-latest
             target: aarch64-apple-darwin
-            bin: repo2txt-r
+            bin: repo2txt
     env:
       SKIP_TESTS_OS_NAMES: Windows-aarch64 macOS-aarch64
     steps:
@@ -76,9 +76,9 @@ jobs:
         run: |
           cd target/${{ matrix.target }}/release
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            7z a ../../../repo2txt-r-${{ matrix.os_name }}.zip ${{ matrix.bin }}
+            7z a ../../../repo2txt-${{ matrix.os_name }}.zip ${{ matrix.bin }}
           else
-            tar czvf ../../../repo2txt-r-${{ matrix.os_name }}.tar.gz ${{ matrix.bin }}
+            tar czvf ../../../repo2txt-${{ matrix.os_name }}.tar.gz ${{ matrix.bin }}
           fi
           cd -
         if: |
@@ -86,11 +86,11 @@ jobs:
       - name: Publish release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: repo2txt-r-${{ matrix.os_name }}
-          path: "repo2txt-r-${{ matrix.os_name }}.*"
+          name: repo2txt-${{ matrix.os_name }}
+          path: "repo2txt-${{ matrix.os_name }}.*"
         if: github.ref == 'refs/tags/test-release'
       - name: Generate SHA-256
-        run: shasum -a 256 repo2txt-r-${{ matrix.os_name }}.*
+        run: shasum -a 256 repo2txt-${{ matrix.os_name }}.*
         if: |
           matrix.os == 'macOS-latest' &&
           ( startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/tags/test-release' )
@@ -98,5 +98,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           draft: true
-          files: "repo2txt-r-${{ matrix.os_name }}.*"
+          files: "repo2txt-${{ matrix.os_name }}.*"
         if: startsWith(github.ref, 'refs/tags/v')
