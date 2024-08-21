@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build from (leave empty for latest)'
+        required: false
+        type: string
 
 env:
   CRATE_NAME: repo2txt
@@ -45,16 +51,39 @@ jobs:
     env:
       SKIP_TESTS_OS_NAMES: Windows-aarch64 macOS-aarch64
     steps:
+      - name: Determine tag to build
+        id: determine_tag
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.tag }}" ]]; then
+            echo "Building from specified tag: ${{ github.event.inputs.tag }}"
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            LATEST_TAG=$(git describe --tags --abbrev=0)
+            echo "Building from latest tag: $LATEST_TAG"
+            echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          else
+            echo "Building from current tag: ${{ github.ref_name }}"
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.determine_tag.outputs.tag }}
+
       - name: Cache cargo & target directories
         uses: Swatinem/rust-cache@v2
+
       - name: Configure Git
         run: |
           git config --global user.email "jdoe@example.com"
           git config --global user.name "J. Doe"
+
       - name: Install musl-tools on Linux
         run: sudo apt-get update --yes && sudo apt-get install --yes musl-tools
         if: contains(matrix.target, 'musl')
+
       - name: Build binary
         uses: houseabsolute/actions-rust-cross@v0
         with:
@@ -63,6 +92,7 @@ jobs:
           toolchain: stable
           args: "--release"
           strip: true
+
       - name: Run tests
         uses: houseabsolute/actions-rust-cross@v0
         with:
@@ -71,6 +101,7 @@ jobs:
           toolchain: stable
           args: "--release"
         if: ${{ !contains(env.SKIP_TESTS_OS_NAMES, matrix.os_name) }}
+
       - name: Package as archive
         shell: bash
         run: |
@@ -82,21 +113,25 @@ jobs:
           fi
           cd -
         if: |
-          github.ref_name == 'refs/tags/test-release' || startsWith(github.ref, 'refs/tags/v')
+          github.ref_name == 'refs/tags/test-release' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+
       - name: Publish release artifacts
         uses: actions/upload-artifact@v4
         with:
           name: repo2txt-${{ matrix.os_name }}
           path: "repo2txt-${{ matrix.os_name }}.*"
-        if: github.ref == 'refs/tags/test-release'
+        if: github.ref == 'refs/tags/test-release' || github.event_name == 'workflow_dispatch'
+
       - name: Generate SHA-256
         run: shasum -a 256 repo2txt-${{ matrix.os_name }}.*
         if: |
           matrix.os == 'macOS-latest' &&
-          ( startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/tags/test-release' )
+          ( startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/tags/test-release' || github.event_name == 'workflow_dispatch' )
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           draft: true
           files: "repo2txt-${{ matrix.os_name }}.*"
-        if: startsWith(github.ref, 'refs/tags/v')
+          tag_name: ${{ steps.determine_tag.outputs.tag }}
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
