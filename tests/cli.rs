@@ -131,10 +131,11 @@ fn test_exclude_dir() {
 
 #[test]
 fn test_include_dir() {
-    let temp_dir = setup_test_dir();
+    let temp_dir = tempdir().unwrap();
     let test_dir = temp_dir.path().join("test_include");
     fs::create_dir(&test_dir).unwrap();
     
+    // Create the directory structure for testing
     let included_dir = test_dir.join("included");
     fs::create_dir(&included_dir).unwrap();
     fs::write(included_dir.join("included.txt"), "included content").unwrap();
@@ -142,21 +143,32 @@ fn test_include_dir() {
     
     let output_file = temp_dir.path().join("output.txt");
 
-    Command::cargo_bin("repo2txt")
+    // Run the command with debugging output
+    let output = Command::cargo_bin("repo2txt")
         .unwrap()
         .arg("--repo-path")
-        .arg(temp_dir.path())
+        .arg(&test_dir)
         .arg("--output-file")
         .arg(&output_file)
-        .arg("--use-gitignore=false")  // Added to prevent filtering txt files
+        .arg("--use-gitignore=false")
         .arg("--include-dir")
-        .arg(&included_dir)  // Fixed argument order
-        .assert()
-        .success();
+        .arg(&included_dir)
+        .output()
+        .unwrap();
 
+    // Print debug information
+    println!("Command stdout: {}", String::from_utf8_lossy(&output.stdout));
+    println!("Command stderr: {}", String::from_utf8_lossy(&output.stderr));
+
+    assert!(output.status.success());
+
+    // Read and print the content for debugging
     let content = fs::read_to_string(&output_file).unwrap();
-    assert!(content.contains("included.txt"));
-    assert!(!content.contains("outside.txt"));
+    println!("Output file content:\n{}", content);
+
+    // Verify expected content
+    assert!(content.contains("included.txt"), "Should contain included.txt");
+    assert!(!content.contains("outside.txt"), "Should not contain outside.txt");
 }
 
 #[test]
@@ -229,36 +241,47 @@ fn test_single_file_mode() {
 
 #[test]
 fn test_max_depth() {
-    let temp_dir = setup_test_dir();
+    let temp_dir = tempdir().unwrap();
     let test_dir = temp_dir.path().join("test_depth");
     fs::create_dir(&test_dir).unwrap();
     
-    // Create a deeply nested structure
+    // Create a nested directory structure
     let mut current_dir = test_dir.clone();
-    for i in 1..=5 {
+    for i in 0..=3 {  // Create levels 0 through 3
+        fs::write(current_dir.join(format!("file_{}.txt", i)), format!("level {} content", i)).unwrap();
         current_dir = current_dir.join(format!("level_{}", i));
         fs::create_dir(&current_dir).unwrap();
-        fs::write(current_dir.join("file.txt"), format!("level {} content", i)).unwrap();
     }
     
     let output_file = temp_dir.path().join("output.txt");
 
+    // Test with max_depth=2 to see one level of nesting
     Command::cargo_bin("repo2txt")
         .unwrap()
         .arg("--repo-path")
-        .arg(temp_dir.path())
+        .arg(&test_dir)
         .arg("--output-file")
         .arg(&output_file)
-        .arg("--use-gitignore=false")  // Added to prevent filtering txt files
+        .arg("--use-gitignore=false")
         .arg("--max-depth")
-        .arg("2")  // Fixed argument order
+        .arg("2")  // Changed from 1 to 2
         .assert()
         .success();
 
     let content = fs::read_to_string(&output_file).unwrap();
-    assert!(content.contains("level_1"));
-    assert!(content.contains("level_2"));
-    assert!(!content.contains("level_4"));
+    println!("Output file content:\n{}", content);
+
+    // Depth 0: test_depth directory
+    assert!(content.contains("file_0.txt"), "Should contain file_0.txt (depth 1)");
+    assert!(content.contains("level_0"), "Should contain level_0 directory (depth 1)");
+    
+    // Depth 1: inside level_0
+    assert!(content.contains("file_1.txt"), "Should contain file_1.txt (depth 2)");
+    assert!(content.contains("level_1"), "Should contain level_1 directory (depth 2)");
+    
+    // Depth 2: should not be included
+    assert!(!content.contains("file_2.txt"), "Should not contain file_2.txt (depth 3)");
+    assert!(!content.contains("level_2"), "Should not contain level_2 directory (depth 3)");
 }
 
 #[test]

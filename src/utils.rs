@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use globset::GlobSet;
 use std::sync::Arc;
 use walkdir::{DirEntry, WalkDir};
@@ -14,30 +14,24 @@ pub fn is_ignored(
 ) -> bool {
     let path = entry.path();
     
-    // Check output file using pre-calculated canonical path
+    // Check output file using canonical path
     if let Ok(canonical_path) = path.canonicalize() {
         if canonical_path == output_file_path {
             return true;
         }
     }
     
-    // Handle include_dir first - if specified, only allow files within that directory
+    // Handle include_dir first - if specified, check both containment and ancestry
     if let Some(include_dir) = &args.include_dir {
-        if !path.starts_with(include_dir) {
+        // Allow paths that are either:
+        // 1. Inside the include_dir
+        // 2. Are ancestors of include_dir (needed to traverse to it)
+        if !path.starts_with(include_dir) && !include_dir.starts_with(path) {
             return true;
         }
     }
 
-    // Skip output file
-    if let Ok(canonical_path) = path.canonicalize() {
-        if let Ok(canonical_output) = PathBuf::from(&args.output_file).canonicalize() {
-            if canonical_path == canonical_output {
-                return true;
-            }
-        }
-    }
-
-    // Check depth first
+    // Check depth
     if entry.depth() > args.max_depth {
         return true;
     }
@@ -94,11 +88,9 @@ pub fn walk_entries(
     globset: Arc<GlobSet>,
     output_file_path: &Path
 ) -> Vec<DirEntry> {
-    let max_depth = args.max_depth.min(20);
-    
     WalkDir::new(path)
         .min_depth(0)
-        .max_depth(max_depth)
+        .max_depth(args.max_depth)
         .follow_links(args.follow_symlinks)
         .into_iter()
         .filter_entry(|e| !is_ignored(e, &globset, args, config, output_file_path))
