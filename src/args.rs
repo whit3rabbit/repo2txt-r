@@ -15,7 +15,7 @@ fn parse_set<T: FromStr + Eq + Hash>(s: &str) -> Result<HashSet<T>, String> {
 #[command(
     name = "repo2txt",
     version = "1.2",
-    author = "Your Name <your.email@example.com>",
+    author = "whiterabbit@protonmail.com",
     about = "Document the structure of a GitHub repository."
 )]
 pub struct Args {
@@ -37,10 +37,26 @@ pub struct Args {
     #[arg(long, value_name = "INCLUDE_DIR", help = "Specific directory to include. Only contents of this directory will be documented.")]
     pub include_dir: Option<PathBuf>,
 
-    #[arg(long, help = "Flag to ignore common settings files.", default_value_t = true)]
+    #[arg(
+        long,
+        help = "Flag to ignore common settings files [possible values: true, false]",
+        action = clap::ArgAction::Set,
+        value_parser = clap::value_parser!(bool),
+        num_args = 0..=1,
+        default_value_t = true,
+        default_missing_value = "true"
+    )]
     pub ignore_settings: bool,
 
-    #[arg(long, help = "Use .gitignore file for ignoring files and directories.", default_value_t = true)]
+    #[arg(
+        long,
+        help = "Use .gitignore file for ignoring files [possible values: true, false]",
+        action = clap::ArgAction::Set,
+        value_parser = clap::value_parser!(bool),
+        num_args = 0..=1,
+        default_value_t = true,
+        default_missing_value = "true"
+    )]
     pub use_gitignore: bool,
 
     #[arg(short, long, value_name = "FILE_PATH", help = "Path to a single file to process.")]
@@ -49,7 +65,15 @@ pub struct Args {
     #[arg(long, value_name = "CONFIG_PATH", help = "Path to a custom configuration file. If not specified, the default configuration is used.")]
     pub config_path: Option<PathBuf>,
 
-    #[arg(long, help = "Follow symbolic links when traversing the repository.", default_value_t = false)]
+    #[arg(
+        long,
+        help = "Follow symbolic links when traversing the repository [possible values: true, false]",
+        action = clap::ArgAction::Set,
+        value_parser = clap::value_parser!(bool),
+        num_args = 0..=1,
+        default_value_t = false,
+        default_missing_value = "true"
+    )]
     pub follow_symlinks: bool,
 
     #[arg(long, value_name = "MAX_DEPTH", help = "Maximum depth to traverse in the directory tree. Default is 100.", default_value_t = 100)]
@@ -58,11 +82,19 @@ pub struct Args {
     #[arg(long, value_name = "FORMAT", help = "Output format: text, markdown, or html. Default is text.", value_enum, default_value_t = OutputFormat::Text)]
     pub output_format: OutputFormat,
 
-    #[arg(long, help = "Include hidden files and directories in the documentation.", default_value_t = false)]
+    #[arg(
+        long,
+        help = "Include hidden files and directories in the documentation [possible values: true, false]",
+        action = clap::ArgAction::Set,
+        value_parser = clap::value_parser!(bool),
+        num_args = 0..=1,
+        default_value_t = false,
+        default_missing_value = "true"
+    )]
     pub include_hidden: bool,
 }
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, ValueEnum)]
 pub enum OutputFormat {
     Text,
     Markdown,

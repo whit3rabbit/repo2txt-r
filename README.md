@@ -46,8 +46,8 @@ USAGE:
 OPTIONS:
     -r, --repo_path <REPO_PATH>          Path to the directory to process (i.e., cloned repo). If no path is specified, defaults to the current directory.
     -o, --output_file <OUTPUT_FILE>      Name for the output text file. Defaults to "output.txt".
-        --ignore-files <IGNORE_FILES>    List of file names to ignore. Omit this argument to ignore no file names.
-        --ignore-types <IGNORE_TYPES>    List of file extensions to ignore. Defaults to list in config.json. Omit this argument to ignore no types.
+        --ignore-types <IGNORE_TYPES>    List of file extensions to ignore (without leading dots, e.g., "txt").
+        --ignore-files <IGNORE_FILES>    List of glob patterns for file names/paths to ignore (e.g., "**/temp.txt").
         --exclude-dir <EXCLUDE_DIR>      List of directory names to exclude or "none" for no directories.
         --ignore-settings                Flag to ignore common settings files.
         --include-dir <INCLUDE_DIR>      Specific directory to include. Only contents of this directory will be documented.

@@ -1,7 +1,6 @@
 use std::fs::File;
 use std::io::{self, Write};
-use std::path::Path;
-use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use std::sync::Arc;
 
@@ -11,8 +10,8 @@ mod utils;
 mod write;
 use crate::args::{Args, OutputFormat, parse_args};
 use crate::config::Config;
-use crate::utils::walk_repo;
-use crate::write::{write_tree, write_file_contents_in_order, write_file_content};
+use crate::utils::walk_entries;
+use crate::write::{write_tree, write_file_content, write_file_contents};
 
 fn load_default_config() -> Config {
     let json_str = include_str!("config.json");
@@ -22,25 +21,26 @@ fn load_default_config() -> Config {
 
 fn load_config_from_file(file_path: &Path) -> io::Result<Config> {
     let file_content = std::fs::read_to_string(file_path)?;
-    let config: Config = serde_json::from_str(&file_content)?;
-    Ok(Config::new(config))
+    serde_json::from_str(&file_content)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Failed to parse config file: {}", e)))
 }
 
-fn create_globset(args: &Args, config: &Config) -> io::Result<Arc<GlobSet>> {
+fn create_globset(args: &Args) -> io::Result<Arc<GlobSet>> {
     let mut glob_builder = GlobSetBuilder::new();
     
+    // Process ignore_files as exact glob patterns
     for pattern in &args.ignore_files {
         glob_builder.add(Glob::new(pattern).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid ignore file pattern '{}': {}", pattern, e)))?);
     }
+    
+    // Process ignore_types by trimming leading dots and creating *.ext globs
     for pattern in &args.ignore_types {
-        glob_builder.add(Glob::new(&format!("*.{}", pattern)).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid ignore type pattern '{}': {}", pattern, e)))?);
-    }
-    for pattern in &config.default_ignore_types {
-        if !args.ignore_types.contains(pattern) {
-            glob_builder.add(Glob::new(pattern).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid default ignore type pattern '{}': {}", pattern, e)))?);
-        }
+        let trimmed = pattern.trim_start_matches('.');
+        let glob_pattern = format!("*.{}", trimmed);
+        glob_builder.add(Glob::new(&glob_pattern).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid ignore type pattern '{}': {}", pattern, e)))?);
     }
     
+    // Build the glob set
     glob_builder.build()
         .map(Arc::new)
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("Failed to build GlobSet: {}", e)))
@@ -84,9 +84,11 @@ fn write_header(output_file: &mut File, args: &Args) -> io::Result<()> {
 }
 
 fn main() -> io::Result<()> {
+    // Parse command line arguments
     let args = parse_args();
     println!("Debug: args = {:?}", args);
 
+    // Load configuration
     let config = if let Some(config_path) = &args.config_path {
         load_config_from_file(config_path).unwrap_or_else(|e| {
             eprintln!("Warning: Failed to load config from file: {}. Using default config.\nError: {}", config_path.display(), e);
@@ -97,12 +99,19 @@ fn main() -> io::Result<()> {
     };
     println!("Debug: config loaded");
 
+    // Create output file
     let mut output_file = File::create(&args.output_file)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to create output file '{}': {}", args.output_file, e)))?;
     println!("Debug: output file created: {}", args.output_file);
 
+    // Get canonical path for output file
+    let output_file_path = std::fs::canonicalize(&args.output_file)
+        .unwrap_or_else(|_| PathBuf::from(&args.output_file));
+
+    // Write documentation header
     write_header(&mut output_file, &args)?;
 
+    // Determine repository path
     let repo_path = if args.repo_path.as_os_str().is_empty() {
         Path::new(".")
     } else {
@@ -110,32 +119,37 @@ fn main() -> io::Result<()> {
     };
     println!("Debug: Using repo_path = {:?}", repo_path);
 
+    // Create glob patterns for file filtering
+    let globset = create_globset(&args)?;
+
+    // Handle single file mode vs repository mode
     if let Some(file_path) = &args.file_path {
         if !file_path.exists() {
             return Err(io::Error::new(io::ErrorKind::NotFound, format!("The specified file does not exist: {}", file_path.display())));
         }
-        write_file_content(file_path, &mut output_file, &args)?;
+        write_file_content(file_path, &mut output_file)?;
     } else {
+        // Repository mode
         if !repo_path.is_dir() {
             return Err(io::Error::new(io::ErrorKind::NotFound, format!("The specified directory does not exist or is not a directory: {}", repo_path.display())));
         }
 
-        let globset = create_globset(&args, &config)?;
-        println!("Debug: GlobSet created");
+        // Get all entries
+        let entries = walk_entries(repo_path, &args, &config, Arc::clone(&globset), &output_file_path);
 
+        // Write directory tree
         writeln!(output_file, "Directory/File Tree Begins -->\n")?;
-        let mut seen_tree = HashSet::new();
-        let walker_tree = walk_repo(repo_path, &args, &config, Arc::clone(&globset));
-        println!("Debug: Walker created for tree");
-        write_tree(walker_tree, &mut output_file, &args, &config, "", args.max_depth, 0, &mut seen_tree, Arc::clone(&globset), &args.output_file)?;
+        write_tree(&entries, &mut output_file)?;
         writeln!(output_file, "\n<-- Directory/File Tree Ends")?;
 
+        // Write file contents
         writeln!(output_file, "\nFile Content Begins -->\n")?;
-        let mut seen_content = HashSet::new();
-        let walker_content = walk_repo(repo_path, &args, &config, Arc::clone(&globset));
-        println!("Debug: Walker created for content");
-        write_file_contents_in_order(walker_content, &mut output_file, &args, &config, &mut seen_content, globset, &args.output_file)?;
+        write_file_contents(&entries, &mut output_file, &args)?;
         writeln!(output_file, "\n<-- File Content Ends\n")?;
+    }
+
+    if args.output_format == OutputFormat::HTML {
+        writeln!(output_file, "</body>\n</html>")?;
     }
 
     println!("Documentation generated successfully. Output written to: {}", args.output_file);

@@ -4,13 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-clap = { version = "4.5.7", features = ["derive"] }
-ignore = "0.4.22"
-serde_json = "1.0.117"
-serde = { version = "1.0.203", features = ["derive"] }
-serde_derive = "1.0"
-globset = "0.4.14"
+clap = { version = "4.5.27", features = ["derive"] }
+serde_json = "1.0.138"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_derive = "1.0.217"
+globset = "0.4.15"
+num_cpus = "1.16.0"
+walkdir = "2.5.0" 
 
 [dev-dependencies]
-assert_cmd = "2.0"
-tempfile = "3.3"
+assert_cmd = "2.0.16"
+tempfile = "3.16.0"

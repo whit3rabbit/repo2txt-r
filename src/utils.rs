@@ -1,69 +1,107 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use globset::GlobSet;
 use std::sync::Arc;
-use ignore::{WalkBuilder, Walk};
+use walkdir::{DirEntry, WalkDir};
 use crate::args::Args;
 use crate::config::Config;
 
-pub fn is_ignored(path: &Path, globset: &Arc<GlobSet>, args: &Args, _config: &Config) -> bool {
-    let path_str = path.to_str().unwrap_or("");
-
-    // Check custom ignore patterns
-    if globset.is_match(path_str) {
-        println!("Debug: Ignored by globset: {:?}", path);
-        return true;
+pub fn is_ignored(
+    entry: &DirEntry,
+    globset: &Arc<GlobSet>,
+    args: &Args,
+    _config: &Config,
+    output_file_path: &Path
+) -> bool {
+    let path = entry.path();
+    
+    // Check output file using pre-calculated canonical path
+    if let Ok(canonical_path) = path.canonicalize() {
+        if canonical_path == output_file_path {
+            return true;
+        }
     }
-
-    // Check excluded directories
-    if path.is_dir() && args.exclude_dir.contains(&path.file_name().unwrap_or_default().to_string_lossy().to_string()) {
-        println!("Debug: Ignored directory: {:?}", path);
-        return true;
-    }
-
-    // Check if path is within the included directory (if specified)
+    
+    // Handle include_dir first - if specified, only allow files within that directory
     if let Some(include_dir) = &args.include_dir {
         if !path.starts_with(include_dir) {
-            println!("Debug: Not in included directory: {:?}", path);
             return true;
         }
     }
 
-    // Ignore hidden files and directories unless explicitly included
-    if !args.include_hidden {
-        if let Some(file_name) = path.file_name() {
-            if file_name.to_str().map(|s| s.starts_with('.')).unwrap_or(false) {
-                println!("Debug: Ignored hidden file/directory: {:?}", path);
+    // Skip output file
+    if let Ok(canonical_path) = path.canonicalize() {
+        if let Ok(canonical_output) = PathBuf::from(&args.output_file).canonicalize() {
+            if canonical_path == canonical_output {
                 return true;
             }
         }
     }
 
-    println!("Debug: Not ignored: {:?}", path);
+    // Check depth first
+    if entry.depth() > args.max_depth {
+        return true;
+    }
+
+    // Skip excluded directories
+    if path.is_dir() {
+        if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
+            if args.exclude_dir.contains(dir_name) {
+                return true;
+            }
+        }
+    }
+
+    // Handle file-specific filters for non-directory entries
+    if path.is_file() {
+        // Check file name against ignore_files
+        if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+            if args.ignore_files.contains(file_name) {
+                return true;
+            }
+        }
+
+        // Check extensions against ignore_types
+        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            if args.ignore_types.contains(&ext.to_lowercase()) {
+                return true;
+            }
+        }
+
+        // Handle settings files
+        if args.ignore_settings {
+            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                if ext.eq_ignore_ascii_case("json") || 
+                   ext.eq_ignore_ascii_case("yaml") || 
+                   ext.eq_ignore_ascii_case("yml") {
+                    return true;
+                }
+            }
+        }
+    }
+
+    // Check against globset patterns
+    if !globset.is_empty() && globset.is_match(path) {
+        return true;
+    }
+
     false
 }
 
-pub fn walk_repo(repo_path: &Path, args: &Args, config: &Config, globset: Arc<GlobSet>) -> Walk {
-    println!("Debug: Entering walk_repo function");
-    let mut builder = WalkBuilder::new(repo_path);
-    println!("Debug: WalkBuilder created for path: {:?}", repo_path);
-
-    if args.use_gitignore {
-        builder.git_ignore(true);
-        builder.ignore(true);
-        println!("Debug: Using .gitignore");
-    }
-
-    let args_clone = args.clone();
-    let config_clone = config.clone();
-    let globset_clone = Arc::clone(&globset);
-
-    builder.filter_entry(move |entry| {
-        let should_include = !is_ignored(entry.path(), &globset_clone, &args_clone, &config_clone);
-        println!("Debug: Checking entry: {:?}, Include: {}", entry.path(), should_include);
-        should_include
-    });
-    builder.standard_filters(false).follow_links(args.follow_symlinks);
-
-    println!("Debug: Returning Walk object");
-    builder.build()
+pub fn walk_entries(
+    path: &Path,
+    args: &Args,
+    config: &Config,
+    globset: Arc<GlobSet>,
+    output_file_path: &Path
+) -> Vec<DirEntry> {
+    let max_depth = args.max_depth.min(20);
+    
+    WalkDir::new(path)
+        .min_depth(0)
+        .max_depth(max_depth)
+        .follow_links(args.follow_symlinks)
+        .into_iter()
+        .filter_entry(|e| !is_ignored(e, &globset, args, config, output_file_path))
+        .filter_map(|e| e.ok())
+        .collect()
 }
