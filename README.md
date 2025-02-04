@@ -1,93 +1,141 @@
 # repo2txt
 
-`repo2txt` is a command-line tool that documents the structure of a GitHub repository. It generates a text file containing a directory/file tree and the contents of each file in the repository.
+`repo2txt` is a command-line tool that documents the structure of a GitHub repository, which is useful to pass to LLM's. It generates documentation containing a directory/file tree and the contents of each file in the repository, with support for multiple output formats.
 
 ## Features
 
-- Generates a text file documenting the repository structure and file contents
-- Supports customizable ignore lists for file names, extensions, and directories
-- Allows specifying a specific directory to include
-- Supports ignoring common settings files
-- Can use the repository's `.gitignore` file to exclude files and directories
-- Provides an option to document a single file instead of the entire repository
+- Documents repository structure and file contents
+- Multiple output formats (text, markdown, HTML)
+- Customizable file and directory filtering:
+  - Ignore specific file types and names using glob patterns
+  - Exclude directories
+  - Include/exclude hidden files
+  - Respect .gitignore rules
+- Advanced traversal options:
+  - Control directory traversal depth
+  - Follow symbolic links
+  - Focus on specific directories
+- Configurable settings via JSON configuration files
+- Single file documentation mode
 
 ## Installation
 
 ### Using Pre-built Binaries
 
-1. Visit the [releases page](https://github.com/whit3rabbit/repo2txt-r/releases) of this repository.
-2. Download the appropriate binary for your operating system.
-3. Extract the downloaded archive.
-4. Move the `repo2txt` binary to a directory in your system's PATH.
+1. Visit the [releases page](https://github.com/whit3rabbit/repo2txt-r/releases)
+2. Download the binary for your operating system
+3. Move the `repo2txt` binary to a directory in your system's PATH
 
 ### Building from Source
 
-1. Ensure you have Rust installed on your system. If not, follow the [official installation guide](https://www.rust-lang.org/tools/install).
-2. Clone this repository:
-   ```
+1. Install Rust using the [official installation guide](https://www.rust-lang.org/tools/install)
+2. Clone the repository:
+   ```bash
    git clone https://github.com/whit3rabbit/repo2txt-r.git
    ```
-3. Navigate to the repository directory:
-   ```
+3. Navigate to the repository:
+   ```bash
    cd repo2txt
    ```
 4. Build the project:
-   ```
+   ```bash
    cargo build --release
    ```
-5. The compiled binary will be located at `target/release/repo2txt-r`. You can move it to a directory in your system's PATH for easier access.
+5. The binary will be at `target/release/repo2txt`. Move it to your PATH for easier access.
 
 ## Usage
 
 ```
-USAGE:
-    repo2txt-r [OPTIONS]
+repo2txt [OPTIONS]
 
-OPTIONS:
-    -r, --repo_path <REPO_PATH>          Path to the directory to process (i.e., cloned repo). If no path is specified, defaults to the current directory.
-    -o, --output_file <OUTPUT_FILE>      Name for the output text file. Defaults to "output.txt".
-        --ignore-types <IGNORE_TYPES>    List of file extensions to ignore (without leading dots, e.g., "txt").
-        --ignore-files <IGNORE_FILES>    List of glob patterns for file names/paths to ignore (e.g., "**/temp.txt").
-        --exclude-dir <EXCLUDE_DIR>      List of directory names to exclude or "none" for no directories.
-        --ignore-settings                Flag to ignore common settings files.
-        --include-dir <INCLUDE_DIR>      Specific directory to include. Only contents of this directory will be documented.
-        --no-gitignore                   Flag to ignore .gitignore file.
-    -f, --file <FILE_PATH>               Path to the file to process.
-    -h, --help                           Print help information
-    -V, --version                        Print version information
+Options:
+  -r, --repo-path <REPO_PATH>        Repository path [default: current directory]
+  -o, --output-file <OUTPUT_FILE>    Output filename [default: output.txt]
+  -f, --file-path <FILE_PATH>        Document a single file
+      --output-format <FORMAT>       Output format: text|markdown|html [default: text]
+      --max-depth <MAX_DEPTH>        Maximum directory traversal depth [default: 100]
+
+Filtering Options:
+      --ignore-files <PATTERNS>      Glob patterns for files to ignore
+      --ignore-types <EXTENSIONS>    File extensions to ignore
+      --exclude-dir <DIRECTORIES>    Directories to exclude [default: node_modules,vendor,dist,build,target]
+      --include-dir <DIRECTORY>      Only document this directory and its contents
+      --include-hidden               Include hidden files/directories [default: false]
+
+Behavior Flags:
+      --ignore-settings             Ignore common settings files [default: true]
+      --use-gitignore              Use .gitignore rules [default: true]
+      --follow-symlinks            Follow symbolic links [default: false]
+      --config-path <PATH>         Custom configuration file path
+
+General:
+  -h, --help                       Print help
+  -V, --version                    Print version
 ```
 
 ## Examples
 
-- Document the structure of a repository:
-  ```
-  repo2txt-r -r /path/to/repo
-  ```
+Document a repository:
 
-- Document a specific directory within a repository:
-  ```
-  repo2txt-r -r /path/to/repo --include-dir /path/to/specific/directory
-  ```
+```bash
+repo2txt -r /path/to/repo
+```
 
-- Document a single file:
-  ```
-  repo2txt-r -f /path/to/file
-  ```
+Generate HTML documentation:
+
+```bash
+repo2txt -r /path/to/repo --output-format html -o documentation.html
+```
+
+Document specific directory with depth limit:
+
+```bash
+repo2txt -r /path/to/repo --include-dir src --max-depth 2
+```
+
+Document single file:
+
+```bash
+repo2txt -f /path/to/file.txt
+```
+
+Ignore specific file types and patterns:
+
+```bash
+repo2txt -r /path/to/repo --ignore-types "txt,log" --ignore-files "temp_*,*.bak"
+```
+
+Include hidden files and follow symlinks:
+
+```bash
+repo2txt -r /path/to/repo --include-hidden --follow-symlinks
+```
 
 ## Configuration
 
-The `config.json` file allows you to customize the behavior of `repo2txt`. You can modify the following settings:
+The default configuration is built into the binary, but you can provide a custom `config.json`:
 
-- `image_extensions`: List of image file extensions to ignore.
-- `video_extensions`: List of video file extensions to ignore.
-- `audio_extensions`: List of audio file extensions to ignore.
-- `document_extensions`: List of document file extensions to ignore.
-- `executable_extensions`: List of executable file extensions to ignore.
-- `settings_extensions`: List of settings file extensions to ignore when using the `--ignore-settings` flag.
-- `additional_ignore_types`: Additional file extensions to ignore.
-- `default_output_file`: Default name for the output text file.
+```json
+{
+  "settings_extensions": [
+    ".json", ".yaml", ".yml", ".xml"
+  ],
+  "default_ignore_types": [
+    "jpg", "jpeg", "png", "gif", "svg",
+    "mp4", "avi", "mov",
+    "mp3", "wav", "flac",
+    "pdf", "doc", "docx",
+    "exe", "dll", "so",
+    "zip", "tar", "gz"
+  ]
+}
+```
 
-This config is built into the binary at build time so it won't do any good to alter it afterwards.
+Use a custom config:
+
+```bash
+repo2txt -r /path/to/repo --config-path my-config.json
+```
 
 ## License
 

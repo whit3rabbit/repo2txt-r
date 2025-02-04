@@ -14,9 +14,9 @@ fn parse_set<T: FromStr + Eq + Hash>(s: &str) -> Result<HashSet<T>, String> {
 #[derive(Debug, Clone, Parser)]
 #[command(
     name = "repo2txt",
-    version = "1.2",
+    version = "0.074",
     author = "whiterabbit@protonmail.com",
-    about = "Document the structure of a GitHub repository."
+    about = "Repo2txt helps you document the structure of a GitHub repository."
 )]
 pub struct Args {
     #[arg(short, long, value_name = "REPO_PATH", help = "Path to the directory to process (i.e., cloned repo). If no path is specified, defaults to the current directory.", default_value = ".")]
